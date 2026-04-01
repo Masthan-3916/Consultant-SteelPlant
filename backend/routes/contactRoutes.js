@@ -5,8 +5,7 @@ const Contact = require('../models/Contact');
 router.post('/', async (req, res) => {
   try {
     const { name, email, message } = req.body;
-    const newContact = new Contact({ name, email, message });
-    await newContact.save();
+    await Contact.create({ name, email, message });
     res.status(201).json({ success: true, message: 'Message sent successfully.' });
   } catch (error) {
     console.error(error);
@@ -17,11 +16,13 @@ router.post('/', async (req, res) => {
 // Admin fetching contacts
 router.get('/', async (req, res) => {
   try {
-    const contacts = await Contact.find().sort({ date: -1 });
+    const contacts = await Contact.findAll({ order: [['date', 'DESC']] });
     res.json(contacts);
   } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 module.exports = router;
+

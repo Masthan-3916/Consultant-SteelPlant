@@ -12,24 +12,24 @@ router.use(authMiddleware);
 /* --- Dashboard Overview Stats --- */
 router.get('/stats', async (req, res) => {
   try {
-    const totalProjects = await Project.countDocuments();
-    const completedProjects = await Project.countDocuments({ status: 'Completed' });
-    const totalEmployees = await Employee.countDocuments({ status: 'Active' });
-    const totalInventoryCount = await Inventory.countDocuments();
-    const totalSalaries = await Employee.aggregate([
-      { $match: { status: 'Active' } },
-      { $group: { _id: null, total: { $sum: "$monthlySalary" } } }
-    ]);
+    const totalProjects = await Project.count();
+    const completedProjects = await Project.count({ where: { status: 'Completed' } });
+    const totalEmployees = await Employee.count({ where: { status: 'Active' } });
+    const totalInventoryCount = await Inventory.count();
+
+    // Sum of salaries
+    const totalSalaries = await Employee.sum('monthlySalary', { where: { status: 'Active' } });
 
     res.json({
-        totalProjects,
-        completedProjects,
-        totalEmployees,
-        totalInventoryCount,
-        monthlyPayroll: totalSalaries[0]?.total || 0,
-        inProgressProjects: totalProjects - completedProjects
+      totalProjects,
+      completedProjects,
+      totalEmployees,
+      totalInventoryCount,
+      monthlyPayroll: totalSalaries || 0,
+      inProgressProjects: totalProjects - completedProjects
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ error: 'Server error fetching stats' });
   }
 });
@@ -37,7 +37,7 @@ router.get('/stats', async (req, res) => {
 /* --- Employee Management --- */
 router.get('/employees', async (req, res) => {
   try {
-    const employees = await Employee.find().sort({ dateJoined: -1 });
+    const employees = await Employee.findAll({ order: [['dateJoined', 'DESC']] });
     res.json(employees);
   } catch (err) {
     res.status(500).json({ error: 'Error fetching employees' });
@@ -46,8 +46,7 @@ router.get('/employees', async (req, res) => {
 
 router.post('/employees', async (req, res) => {
   try {
-    const newEmployee = new Employee(req.body);
-    await newEmployee.save();
+    const newEmployee = await Employee.create(req.body);
     res.status(201).json(newEmployee);
   } catch (err) {
     res.status(500).json({ error: 'Error creating employee' });
@@ -56,7 +55,7 @@ router.post('/employees', async (req, res) => {
 
 router.delete('/employees/:id', async (req, res) => {
   try {
-    await Employee.findByIdAndDelete(req.params.id);
+    await Employee.destroy({ where: { id: req.params.id } });
     res.json({ message: 'Employee removed' });
   } catch (err) {
     res.status(500).json({ error: 'Error deleting employee' });
@@ -66,7 +65,7 @@ router.delete('/employees/:id', async (req, res) => {
 /* --- Inventory / Material Management --- */
 router.get('/inventory', async (req, res) => {
   try {
-    const inventory = await Inventory.find().sort({ lastUpdated: -1 });
+    const inventory = await Inventory.findAll({ order: [['lastUpdated', 'DESC']] });
     res.json(inventory);
   } catch (err) {
     res.status(500).json({ error: 'Error fetching inventory' });
@@ -75,8 +74,7 @@ router.get('/inventory', async (req, res) => {
 
 router.post('/inventory', async (req, res) => {
   try {
-    const newItem = new Inventory(req.body);
-    await newItem.save();
+    const newItem = await Inventory.create(req.body);
     res.status(201).json(newItem);
   } catch (err) {
     res.status(500).json({ error: 'Error adding inventory item' });
@@ -85,7 +83,8 @@ router.post('/inventory', async (req, res) => {
 
 router.put('/inventory/:id', async (req, res) => {
   try {
-    const updated = await Inventory.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    await Inventory.update(req.body, { where: { id: req.params.id } });
+    const updated = await Inventory.findByPk(req.params.id);
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'Error updating inventory' });
@@ -94,7 +93,7 @@ router.put('/inventory/:id', async (req, res) => {
 
 router.delete('/inventory/:id', async (req, res) => {
   try {
-    await Inventory.findByIdAndDelete(req.params.id);
+    await Inventory.destroy({ where: { id: req.params.id } });
     res.json({ message: 'Stock item removed' });
   } catch (err) {
     res.status(500).json({ error: 'Error deleting inventory item' });
@@ -104,7 +103,7 @@ router.delete('/inventory/:id', async (req, res) => {
 /* --- Project Management --- */
 router.get('/projects', async (req, res) => {
   try {
-    const projects = await Project.find().sort({ dateCompleted: -1 });
+    const projects = await Project.findAll({ order: [['dateCompleted', 'DESC']] });
     res.json(projects);
   } catch (err) {
     res.status(500).json({ error: 'Error fetching projects' });
@@ -113,8 +112,7 @@ router.get('/projects', async (req, res) => {
 
 router.post('/projects', async (req, res) => {
   try {
-    const newProject = new Project(req.body);
-    await newProject.save();
+    const newProject = await Project.create(req.body);
     res.status(201).json(newProject);
   } catch (err) {
     res.status(500).json({ error: 'Error creating project' });
@@ -123,16 +121,17 @@ router.post('/projects', async (req, res) => {
 
 router.put('/projects/:id', async (req, res) => {
   try {
-      const updated = await Project.findByIdAndUpdate(req.params.id, req.body, { new: true });
-      res.json(updated);
-  } catch(err) {
-      res.status(500).json({ error: 'Error updating project' });
+    await Project.update(req.body, { where: { id: req.params.id } });
+    const updated = await Project.findByPk(req.params.id);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Error updating project' });
   }
 });
 
 router.delete('/projects/:id', async (req, res) => {
   try {
-    await Project.findByIdAndDelete(req.params.id);
+    await Project.destroy({ where: { id: req.params.id } });
     res.json({ message: 'Project removed' });
   } catch (err) {
     res.status(500).json({ error: 'Error deleting project' });
@@ -141,30 +140,32 @@ router.delete('/projects/:id', async (req, res) => {
 
 /* --- Message/Contact Log --- */
 router.get('/contacts', async (req, res) => {
-    try {
-        const contacts = await Contact.find().sort({ date: -1 });
-        res.json(contacts);
-    } catch(err) {
-        res.status(500).json({ error: 'Error fetching contact log' });
-    }
+  try {
+    const contacts = await Contact.findAll({ order: [['date', 'DESC']] });
+    res.json(contacts);
+  } catch (err) {
+    res.status(500).json({ error: 'Error fetching contact log' });
+  }
 });
 
 router.put('/contacts/:id', async (req, res) => {
-    try {
-        const updated = await Contact.findByIdAndUpdate(req.params.id, req.body, { new: true });
-        res.json(updated);
-    } catch(err) {
-        res.status(500).json({ error: 'Error updating contact' });
-    }
+  try {
+    await Contact.update(req.body, { where: { id: req.params.id } });
+    const updated = await Contact.findByPk(req.params.id);
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: 'Error updating contact' });
+  }
 });
 
 router.delete('/contacts/:id', async (req, res) => {
-    try {
-        await Contact.findByIdAndDelete(req.params.id);
-        res.json({ message: 'Inquiry removed' });
-    } catch(err) {
-        res.status(500).json({ error: 'Error deleting contact' });
-    }
+  try {
+    await Contact.destroy({ where: { id: req.params.id } });
+    res.json({ message: 'Inquiry removed' });
+  } catch (err) {
+    res.status(500).json({ error: 'Error deleting contact' });
+  }
 });
 
 module.exports = router;
+

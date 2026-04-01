@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+const { sequelize } = require('./config/db');
 const User = require('./models/User');
 const Employee = require('./models/Employee');
 const Inventory = require('./models/Inventory');
@@ -7,28 +7,22 @@ require('dotenv').config();
 
 const seed = async () => {
     try {
-        await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/steel_consultant');
-        console.log('Clearing old data...');
-        await Promise.all([
-            User.deleteMany({}),
-            Employee.deleteMany({}),
-            Inventory.deleteMany({}),
-            Project.deleteMany({})
-        ]);
+        // Sync database (force: true will drop and recreate tables)
+        await sequelize.sync({ force: true });
+        console.log('Database synced (all tables dropped and recreated)...');
 
         console.log('Seeding new data...');
-        
+
         // Admin
-        const admin = new User({
+        await User.create({
             name: 'Super Admin',
             email: 'admin@steelplant.com',
             password: 'adminpassword123',
             role: 'admin'
         });
-        await admin.save();
 
         // Employees
-        await Employee.insertMany([
+        await Employee.bulkCreate([
             { name: 'Arun Kumar', position: 'Chief Consultant', department: 'Metallurgy', monthlySalary: 12000, status: 'Active' },
             { name: 'Sarah Jenkins', position: 'Project Director', department: 'Engineering', monthlySalary: 10500, status: 'Active' },
             { name: 'Michael Chen', position: 'Safety Inspector', department: 'Compliance', monthlySalary: 8000, status: 'Active' },
@@ -36,7 +30,7 @@ const seed = async () => {
         ]);
 
         // Inventory
-        await Inventory.insertMany([
+        await Inventory.bulkCreate([
             { itemName: 'Raw Limestone', quantity: 12400, unit: 'tons', warehouseLocation: 'Gudon-A', category: 'Raw Material' },
             { itemName: 'Iron Ore Sinter', quantity: 45000, unit: 'tons', warehouseLocation: 'Gudon-B', category: 'Raw Material' },
             { itemName: 'Steel Rods (12mm)', quantity: 5500, unit: 'tons', warehouseLocation: 'Gudon-C', category: 'Finished Good' },
@@ -44,7 +38,7 @@ const seed = async () => {
         ]);
 
         // Projects
-        await Project.insertMany([
+        await Project.bulkCreate([
             { title: 'Blast Furnace #4 Optimization', description: 'Increasing yield by 15% via process tuning.', status: 'Completed', client: 'Dubai Steel Corp', cost: 450000 },
             { title: 'Safety Framework Integration', description: 'World-class EHS standards setup.', status: 'In Progress', client: 'Global Metal Ltd', cost: 120000 },
             { title: 'Casting Mill Automation', description: 'Industry 4.0 IoT deployment.', status: 'In Progress', client: 'Tata Steel (Sample)', cost: 890000 }
@@ -59,3 +53,4 @@ const seed = async () => {
 };
 
 seed();
+

@@ -1,5 +1,5 @@
 const express = require('express');
-const mongoose = require('mongoose');
+const { sequelize, connectDB } = require('./config/db');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -16,44 +16,46 @@ app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/contact', require('./routes/contactRoutes'));
 
 app.get('/', (req, res) => {
-  res.send('Steel Plant Consultant API Running');
+  res.send('Steel Plant Consultant API Running (MySQL)');
 });
 
-// Database Connection
-const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/steel_consultant';
+// Database Connection and Sync
+const startServer = async () => {
+  try {
+    await connectDB();
 
-mongoose.connect(mongoURI)
-  .then(async () => {
-    console.log('MongoDB connection successful!');
-    
+    // Sync models
+    await sequelize.sync({ alter: true }); // Use force: true to drop and recreate tables (be careful!)
+    console.log('Database synced successfully');
+
     // Auto-seed if empty
     const User = require('./models/User');
-    const userCount = await User.countDocuments();
+    const userCount = await User.count();
+
     if (userCount === 0) {
       console.log('No users found. Running auto-seed...');
       try {
-        const Project = require('./models/Project');
         const Employee = require('./models/Employee');
         const Inventory = require('./models/Inventory');
 
         // Create Admin
-        await new User({
-            name: 'Super Admin',
-            email: 'admin@steelplant.com',
-            password: 'adminpassword123',
-            role: 'admin'
-        }).save();
+        await User.create({
+          name: 'Super Admin',
+          email: 'admin@steelplant.com',
+          password: 'adminpassword123',
+          role: 'admin'
+        });
 
         // Seed Employees
-        await Employee.insertMany([
-            { name: 'Arun Kumar', position: 'Chief Consultant', department: 'Metallurgy', monthlySalary: 12000, status: 'Active' },
-            { name: 'Sarah Jenkins', position: 'Project Director', department: 'Engineering', monthlySalary: 10500, status: 'Active' }
+        await Employee.bulkCreate([
+          { name: 'Arun Kumar', position: 'Chief Consultant', department: 'Metallurgy', monthlySalary: 12000, status: 'Active' },
+          { name: 'Sarah Jenkins', position: 'Project Director', department: 'Engineering', monthlySalary: 10500, status: 'Active' }
         ]);
 
         // Seed Inventory
-        await Inventory.insertMany([
-            { itemName: 'Raw Limestone', quantity: 12400, unit: 'tons', warehouseLocation: 'Gudon-A', category: 'Raw Material' },
-            { itemName: 'Steel Rods (12mm)', quantity: 5500, unit: 'tons', warehouseLocation: 'Gudon-C', category: 'Finished Good' }
+        await Inventory.bulkCreate([
+          { itemName: 'Raw Limestone', quantity: 12400, unit: 'tons', warehouseLocation: 'Gudon-A', category: 'Raw Material' },
+          { itemName: 'Steel Rods (12mm)', quantity: 5500, unit: 'tons', warehouseLocation: 'Gudon-C', category: 'Finished Good' }
         ]);
 
         console.log('✅ Auto-seed completed successfully!');
@@ -61,17 +63,18 @@ mongoose.connect(mongoURI)
         console.error('❌ Auto-seed failed:', seedErr.message);
       }
     }
-  })
-  .catch((err) => {
-    console.error('MongoDB connection error. Please ensure MongoDB is running locally on port 27017.');
-    console.error('Error Details:', err.message);
-  });
 
-// Server Start
-if (process.env.NODE_ENV !== 'production') {
-  app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
-  });
-}
+    // Server Start
+    if (process.env.NODE_ENV !== 'production') {
+      app.listen(PORT, () => {
+        console.log(`Server is running on http://localhost:${PORT}`);
+      });
+    }
+  } catch (err) {
+    console.error('Failed to start server:', err.message);
+  }
+};
+
+startServer();
 
 module.exports = app;

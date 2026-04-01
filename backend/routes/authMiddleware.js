@@ -5,7 +5,7 @@ const authMiddleware = (req, res, next) => {
   if (!token) return res.status(401).json({ error: 'Unauthorized, no token' });
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallbacksecret');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     req.user = decoded;
     if (req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Access denied, Admin only' });
